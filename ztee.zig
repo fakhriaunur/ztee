@@ -7,4 +7,23 @@ pub fn main(init: std.process.Init) !void {
     const stdin = std.Io.File.stdin();
     const stdout = std.Io.File.stdout();
     const stderr = std.Io.File.stderr();
+
+    // check for help
+    if (args.len > 1) {
+        const arg1 = args[1];
+        if (std.mem.eql(u8, arg1, "-h") or std.mem.eql(u8, arg1, "--help")) {
+            const help_text =
+                \\Usage: ztee [OPTION]... [FILE]...
+                \\Copy standard input to each FILE, and also to standard
+                \\output.
+                \\
+                \\  -a, --append        append to the given FILEs, do not
+                \\                      overwrite
+                \\  -h, --help          display this help menu and exit
+                \\
+            ;
+            try stdout.writeStreamingAll(init.io, help_text);
+            return;
+        }
+    }
 }
