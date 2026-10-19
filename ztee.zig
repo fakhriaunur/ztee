@@ -30,4 +30,13 @@ pub fn main(init: std.process.Init) !void {
     // default conf
     var append_mode = false;
     var files_start_idx: usize = 1;
+
+    // check for append flag
+    if (args.len > 1) {
+        const arg1 = args[1];
+        if (std.mem.eql(u8, arg1, "-a") or std.mem.eql(u8, arg1, "--append")) {
+            append_mode = true;
+            files_start_idx = 2;
+        }
+    }
 }
