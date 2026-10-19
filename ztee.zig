@@ -2,13 +2,14 @@ const std = @import("std");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.arena.allocator();
-    const args = try try init.minimal.args.toSlice(allocator);
+    const args = try init.minimal.args.toSlice(allocator);
 
     const stdin = std.Io.File.stdin();
     const stdout = std.Io.File.stdout();
     const stderr = std.Io.File.stderr();
 
     // check for help
+    // @compileLog("help arg");
     if (args.len > 1) {
         const arg1 = args[1];
         if (std.mem.eql(u8, arg1, "-h") or std.mem.eql(u8, arg1, "--help")) {
@@ -32,6 +33,7 @@ pub fn main(init: std.process.Init) !void {
     var files_start_idx: usize = 1;
 
     // check for append flag
+    // @compileLog("append arg");
     if (args.len > 1) {
         const arg1 = args[1];
         if (std.mem.eql(u8, arg1, "-a") or std.mem.eql(u8, arg1, "--append")) {
@@ -41,9 +43,9 @@ pub fn main(init: std.process.Init) !void {
     }
 
     // Open output files
-    var output_files = std.ArrayList(std.io.File).empty;
+    var output_files = std.ArrayList(std.Io.File).empty;
     defer {
-        for (output_files.item) |file| file.close(init.io);
+        for (output_files.items) |file| file.close(init.io);
         output_files.deinit(allocator);
     }
 
@@ -62,7 +64,7 @@ pub fn main(init: std.process.Init) !void {
                 .truncate = !append_mode,
             },
         ) catch |err| {
-            const msg = std.fmt.allocPrint(
+            const msg = try std.fmt.allocPrint(
                 allocator,
                 "ztee: {s}: {s}\n",
                 .{ path, @errorName(err) },
@@ -79,4 +81,49 @@ pub fn main(init: std.process.Init) !void {
         try output_files.append(allocator, file);
         try write_offsets.append(allocator, init_offset);
     }
+
+    // I/O loop
+    // @compileLog("i/o loop");
+    var buf: [4096]u8 = undefined;
+    while (true) {
+        const bytes_read = stdin.readStreaming(
+            init.io,
+            &.{&buf},
+        ) catch |err| {
+            if (err == error.EndOfStream) break;
+            return err;
+        };
+        if (bytes_read == 0) break;
+
+        const chunk = buf[0..bytes_read];
+        try stdout.writeStreamingAll(init.io, chunk);
+
+        for (output_files.items, 0..) |file, idx| {
+            if (append_mode) {
+                file.writePositionalAll(
+                    init.io,
+                    chunk,
+                    write_offsets.items[idx],
+                ) catch |err| {
+                    const msg = try std.fmt.allocPrint(
+                        allocator,
+                        "ztee: writer error: {s}\n",
+                        .{@errorName(err)},
+                    );
+                    try stderr.writeStreamingAll(init.io, msg);
+                };
+                write_offsets.items[idx] += chunk.len;
+            } else {
+                file.writeStreamingAll(init.io, chunk) catch |err| {
+                    const msg = try std.fmt.allocPrint(
+                        allocator,
+                        "ztee: writer error: {s}\n",
+                        .{@errorName(err)},
+                    );
+                    try stderr.writeStreamingAll(init.io, msg);
+                };
+            }
+        }
+    }
+    // @compileLog("end");
 }
