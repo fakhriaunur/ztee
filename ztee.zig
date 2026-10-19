@@ -26,4 +26,8 @@ pub fn main(init: std.process.Init) !void {
             return;
         }
     }
+
+    // default conf
+    var append_mode = false;
+    var files_start_idx: usize = 1;
 }
