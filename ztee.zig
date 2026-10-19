@@ -49,4 +49,34 @@ pub fn main(init: std.process.Init) !void {
 
     var write_offsets = std.ArrayList(u64).empty;
     defer write_offsets.deinit(allocator);
+
+    //cmd args loop
+    var i = files_start_idx;
+    while (i < args.len) : (i += 1) {
+        const path = args[i];
+
+        const file = std.Io.Dir.cwd().createFile(
+            init.io,
+            path,
+            .{
+                .truncate = !append_mode,
+            },
+        ) catch |err| {
+            const msg = std.fmt.allocPrint(
+                allocator,
+                "ztee: {s}: {s}\n",
+                .{ path, @errorName(err) },
+            );
+            try stderr.writeStreamingAll(init.io, msg);
+            continue;
+        };
+
+        const init_offset: u64 = if (append_mode) blk: {
+            const stat = try file.stat(init.io);
+            break :blk stat.size;
+        } else 0;
+
+        try output_files.append(allocator, file);
+        try write_offsets.append(allocator, init_offset);
+    }
 }
