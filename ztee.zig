@@ -39,4 +39,14 @@ pub fn main(init: std.process.Init) !void {
             files_start_idx = 2;
         }
     }
+
+    // Open output files
+    var output_files = std.ArrayList(std.io.File).empty;
+    defer {
+        for (output_files.item) |file| file.close(init.io);
+        output_files.deinit(allocator);
+    }
+
+    var write_offsets = std.ArrayList(u64).empty;
+    defer write_offsets.deinit(allocator);
 }
